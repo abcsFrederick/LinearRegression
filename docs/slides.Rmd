@@ -1,7 +1,7 @@
 ---
 title: "Linear Regression"
 author: "Randy Johnson"
-date: "6/1/2018"
+date: "6/21/2018"
 output: slidy_presentation
 ---
 
@@ -10,19 +10,27 @@ knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse) # for data wrangling etc...
 library(cowplot)   # for nicer ggplot defaults
 library(animation) # for animated gifs
+library(car)       # for linear regression diagnostics
+library(broom)     # for `augment()`
+library(knitr)     # for `kable()`
+library(kableExtra)# for additional kable formatting options
 ```
 
-## Overview
+# Overview
 
 - Least squares regression intuition
 - Assumptions
+    - What are they?
+    - Causes
+    - Consequences
+    - Model diagnostics
 - Transformations
 
 ```{r, include=FALSE}
 ########################## Least Squares Regression Intuition ##########################
 ```
 
-## Least Squares Intuition
+# Least Squares Intuition
 
 ```{r intuition data, echo=FALSE}
 ## This code is included here to show what I did.
@@ -44,7 +52,7 @@ ggplot(dat, aes(x, y)) +
     geom_abline(slope = regLine[2], intercept = regLine[1])
 ```
 
-## Least Squares Intuition
+# Least Squares Intuition
 
 ```{r with error terms, echo=FALSE}
 mutate(dat, 
@@ -60,7 +68,7 @@ mutate(dat,
     geom_abline(slope = regLine[2], intercept = regLine[1])
 ```
 
-## Least Squares Intuition
+# Least Squares Intuition
 
 ```{r intuition video, include=FALSE}
 # Function to calculate predicted value and error terms
@@ -97,3 +105,491 @@ if(!file.exists('intuitionVideo.gif')) # this takes a few seconds to render - do
 ```
 
 ![](intuitionVideo.gif)
+
+```{r, include=FALSE}
+############################# Assumptions ##############################
+```
+
+# Linear Relationship
+
+```{r linear1d}
+set.seed(239478)
+```
+
+```{r linear1a, echo=TRUE}
+# some made up data
+linExample <- data_frame(x1 = rnorm(100),
+                         x2 = rnorm(100),
+                         y = x1 + x2^2 + rnorm(100))
+```
+
+```{r linear1b, fig.width=4}
+ggplot(linExample, aes(x1, y)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE)
+
+ggplot(linExample, aes(x2, y)) +
+    geom_point() +
+    geom_smooth(method = 'lm', formula = y ~ identity(x^2), se = FALSE)
+```
+
+# Linear Relationship - Component Residual Plots
+
+```{r linear2, fig.height=4}
+# two models, same data
+# model 1 breaks linearity assumption, model 2 does not
+model1 <- lm(y ~ x1 + x2, data = linExample)
+model2 <- lm(y ~ x1 + identity(x2^2), data = linExample)
+
+# Component - Residual Plots will give us a graphical
+# check of the linearity assumption
+crPlots(model1)
+crPlots(model2)
+```
+
+# Multivariate Normality
+
+```{r mvn1a}
+set.seed(234987)
+```
+
+```{r mvn1b, echo=TRUE}
+mvnExample <- data_frame(x1 = rnorm(100),
+                         y1 = x1 + rnorm(100), # normal error terms
+                         y2 = x1 + rt(100, 3)) # not-normal error terms
+```
+
+```{r mvn1, fig.width=4}
+ggplot(mvnExample, aes(x1, y1)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE) +
+    ylim(range(mvnExample$y2))
+
+ggplot(mvnExample, aes(x1, y2)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se = FALSE)
+```
+
+# Multivariate Normality - Diagnostics (good)
+
+```{r mvn2}
+mvnModel1 <- lm(y1 ~ x1, data = mvnExample)
+
+qqPlot(mvnModel1)
+with(augment(mvnModel1), shapiro.test(.std.resid))
+```
+
+# Multivariate Normality - Diagnostics (bad)
+
+```{r mvn3}
+mvnModel2 <- lm(y2 ~ x1, data = mvnExample)
+
+qqPlot(mvnModel2)
+with(augment(mvnModel2), shapiro.test(.std.resid))
+```
+
+# Multivariate Normality - Model comparison
+
+Model 1 has normal error terms.
+
+```{r mvn4a}
+summary(mvnModel1)
+```
+
+```{r expected r2, eval = FALSE, echo=FALSE}
+set.seed(230948)
+data_frame(x = lapply(rep(100, 100000), rnorm),
+           y = map(x, ~ .x + rnorm(100)),
+           r2 = map2(x, y, ~ cor(.x, .y)^2)) %>%
+    select(r2) %>%
+    unlist() %>%
+    summary() # expect R^2 = 0.5
+```
+
+# Multivariate Normality - Model comparison
+
+Model 2 has non-normal error terms.
+
+```{r mvn4b}
+summary(mvnModel2)
+```
+
+* Residuals have a much larger spread,
+* Standard error is much larger,
+* R^2^ is much lower.
+
+# No/Little Multicollinearity
+
+```{r mcol1a}
+set.seed(239)
+```
+
+```{r mcol1b, echo = TRUE}
+mcol <- data_frame(x1 = rnorm(100),
+                   x2 = x1 + rnorm(100), # x1 and x2 are correlated
+                   x3 = rnorm(100),
+                   y = x1 + x2 + x3 + rnorm(100))
+
+# three models
+model1 <- lm(y ~ x1 + x2 + x3, data = mcol) # everything
+model2 <- lm(y ~ x1 +      x3, data = mcol) # without x2
+model3 <- lm(y ~      x2 + x3, data = mcol) # without x1
+```
+
+# No/Little Multicollinearity - Variance Inflation Factors
+
+```{r vif, echo = TRUE}
+# check for multicollinearity
+vif(model1)
+vif(model2)
+vif(model3)
+```
+
+# No/Little Multicollinearity - Model comparison
+
+```{r mcol table}
+data_frame(model = cell_spec(1:3, align = 'center'),
+           x1 = {c(round(coef(model1)[2], 2),
+                   round(coef(model2)[2], 2),
+                   "") %>%
+                 cell_spec(align = 'left')},
+           x2 = {c(round(coef(model1)[3], 2),
+                   "",
+                   round(coef(model3)[2], 2)) %>%
+                 cell_spec(align = 'left')},
+           x3 = {c(round(coef(model1)[4], 2),
+                   round(coef(model2)[3], 2),
+                   round(coef(model3)[3], 2)) %>%
+                 cell_spec(align = 'left')},
+           r2 = {c(round(summary(model1)$r.squared, 2),
+                   round(summary(model2)$r.squared, 2),
+                   round(summary(model3)$r.squared, 2)) %>%
+                 cell_spec(align = 'left')}) %>%
+    
+    kable(escape = FALSE) %>%
+    kable_styling()
+```
+
+Model coefficients for our three models. Notice how the coefficient for `x3` doesn't change much, but the coefficients for `x1`, `x2` and R^2^ change quite a bit.
+
+# No Autocorrelation
+
+```{r auto1}
+set.seed(2347890)
+dat <- data_frame(x1 = seq(1, 20, length = 200),
+                  y1 = sin(x1) + 0.1*x1 + rnorm(200))
+
+ggplot(dat, aes(x1, y1)) +
+     geom_point()
+```
+
+# No Autocorrelation
+
+```{r auto2}
+ggplot(dat, aes(x1, y1)) +
+     geom_point() +
+     geom_smooth(span = .3, method = 'loess', se = FALSE)
+```
+
+Adding a loess smoother highlights this periodic pattern in the data.
+
+# No Autocorrelation
+
+```{r auto3, echo=TRUE}
+lm(y1 ~ x1, data = dat) %>%
+    durbinWatsonTest()
+```
+
+# Homoscedasticity
+
+```{r homo1, fig.width=4}
+set.seed(234897)
+dat <- data_frame(x1 = rnorm(200) + 3,
+                  y1 = .25*x1 + rnorm(200),
+                  y2 = abs(rnorm(200)*x1))
+
+homModel <- lm(y1 ~ x1, data = dat)
+hetModel <- lm(y2 ~ x1, data = dat)
+
+ggplot(dat, aes(x1, y1)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se=FALSE)
+
+ggplot(dat, aes(x1, y2)) +
+    geom_point() +
+    geom_smooth(method = 'lm', se=FALSE)
+```
+
+# Homoscedasticity
+
+`y1 ~ x1`
+
+```{r homo2}
+spreadLevelPlot(homModel)
+ncvTest(homModel) # y1 ~ x1
+```
+
+# Homoscedasticity
+
+`y2 ~ x1`
+
+```{r homo3}
+spreadLevelPlot(hetModel)
+ncvTest(hetModel) # y2 ~ x1
+```
+
+
+# Homoscedasticity
+
+```{r homo4}
+summary(homModel)
+```
+
+# Homoscedasticity
+
+```{r homo5}
+summary(hetModel)
+```
+
+# Assumptions Summary
+
+```{r assumptions}
+# this is the table I want, but I also want some better formatting
+# | Assumption                  | Cause                | Consequence                 | Diagnosis                 |
+# |:----------------------------|:---------------------|:----------------------------|:--------------------------|
+# | Linear Relationship         | Bad model            | Inaccurate predictions      | `car::crPlots()`          |
+# | Multivariate Normality      | Bad model            | Incorrect statistics        | `car::qqPlot()`           |
+# |                             | Noisy data           | (p-values / CIs)            | `shapiro.test(residuals)` |
+# | No/Little Multicollinearity | Correlated variables | Unstable model coefficients | `car::vif()`              |
+# | No Autocorrelation          | Non-independent data | Inefficient estimators      | `car::durbinWatsonTest()` |
+# | Homoscedasticity            | Bad model            | Incorrect statistics        | `car::ncvTest()`          |
+# |                             | "Bad" data           | (p-values / CIs)            | `car::spreadLevelPlot()`  |
+
+tab <- data_frame(Assumption = c('Linear Relationship', 'Multivariate Normality', 'Multivariate Normality', 
+                                 'No/Little Multicollinearity', 'No Autocorrelation', 'Homoscedasticity', 'Homoscedasticity'),
+                  Cause = c('Incorrect model', 'Incorrect model', 'Noisy data', 'Correlated variables', 
+                            'Non-independent data', 'Incorrect model', '"Bad" data'),
+                  Consequence = c('Inaccurate predictions', 'Incorrect statistics', '(p-values / CIs)', 
+                                  'Unstable model coefficients', 'Inefficient estimators', 'Incorrect statistics',
+                                  '(p-values / CIs)'),
+                  Diagnosis = c('car::crPlots()', 'car::qqPlot()', 'shapiro.test(residuals)', 'car::vif()', 
+                                'car::durbinWatsonTest()', 'car::ncvTest()', 'car::spreadLevelPlot()'))
+
+kable(tab) %>%
+    column_spec(column = 4, monospace = TRUE) %>%
+    collapse_rows(columns = 1, valign = 'top') %>%
+    kable_styling()
+```
+
+# Influential Observations
+
+```{r influence, include = FALSE}
+set.seed(23984)
+infl <- data_frame(x = rnorm(50),
+                   y = x + rnorm(50)) %>%
+        filter(y < max(y) & y > min(y)) # replace this one with the moving point
+
+# Function to calculate predicted value and error terms
+#' @param x x position
+#' @param y y position
+#' @param dat the data frame containing the rest of the data set
+plotLine <- function(x, y, dat)
+{
+    dat <- bind_rows(dat, data_frame(x = x, y = y))
+    
+    mdl <- lm(y ~ x, data = dat)
+    
+    g <- ggplot(dat, aes(x, y)) +
+         geom_point() +
+         # geom_smooth(method = 'lm', se = FALSE) +
+        
+         ylim(c(-3.2, 4)) +
+         xlim(c(-2.4, 2.4)) +
+        
+         geom_abline(slope = coef(mdl)[2], intercept = coef(mdl)[1], color = 'blue') +
+        
+         geom_point(data = data_frame(x = x, y = y), aes(x, y), color = 'red')
+    
+    print(g)
+}
+
+width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width")
+height <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.height")
+
+if(!file.exists('influenceVideo.gif')) # this takes a few seconds to render - don't recreate unless we really want to
+    saveGIF(map2(c(rep(2.4, 20), seq(from = 2.4, to = -2.4, length = 100), rep(-2.4, 30)), # x
+                 c(seq(from = 2.4, to = 4, length = 20), rep(4, 100), seq(from = 4, to = -2.4, length = 30)), # y
+                 plotLine, dat = infl), 
+            movie.name = "influenceVideo.gif", interval = 0.1, autobrowse = FALSE,
+            ani.width = width, ani.height = height)
+```
+
+![](influenceVideo.gif)
+
+# Influential Observations (good)
+
+```{r influence tests}
+mdl <- lm(y ~ x, data = infl)
+
+outlierTest(mdl)
+influencePlot(mdl)
+```
+
+# Influential Observations (bad)
+
+```{r influence tests2}
+mdl <- lm(y ~ x, data = bind_rows(infl, data_frame(x = -2.4, y = 4)))
+
+outlierTest(mdl)
+influencePlot(mdl)
+```
+
+```{r, include=FALSE}
+############################# Transformations ##############################
+```
+
+# Transformations
+
+Many of the problems we encounter in linear regression stem from model choice.
+
+Two most common transormations:
+
+* Power transformations
+* Log/exponential transformations
+
+# Power Transformations
+
+Original model: y ~ β~0~ + β~1~x + ε
+
+With power transformation: y ~ β~0~ + β~1~x^2^ + ε
+
+```{r x2, include = FALSE}
+n <- 100
+
+set.seed(923843)
+pow2 <- data_frame(x = runif(n)*4,
+                   x2 = x^2,
+                   y = x2 + rnorm(n),
+                   x_int = map2(x, x2, ~ seq(from = .x, to = .y, len = 60)))
+
+plotLine <- function(i, dat)
+{
+    g <- mutate(dat, x_to_x2 = sapply(x_int, `[`, i)) %>%
+         ggplot(aes(x_to_x2, y)) +
+         geom_point() +
+         geom_smooth(method = 'loess', se = FALSE)
+
+    print(g)
+}
+
+if(!file.exists("pow2Video.gif"))
+    saveGIF(map(c(1:60, 60:1), plotLine, dat = pow2), 
+            movie.name = "pow2Video.gif", interval = 0.1, autobrowse = FALSE,
+            ani.width = width, ani.height = height)
+```
+
+![](pow2Video.gif)
+
+# Power Transformations
+
+Original model: y ~ β~0~ + β~1~x + ε
+
+With power transformation: y ~ β~0~ + β~1~sqrt(x) + ε
+
+```{r x.5, include = FALSE}
+n <- 100
+
+set.seed(923843)
+pow.5 <- data_frame(x = runif(n)*100,
+                   x.5 = sqrt(x),
+                   y = x.5 + rnorm(n, sd = 0.5),
+                   x_int = map2(x, x.5, ~ seq(from = .x, to = .y, len = 60)))
+
+plotLine <- function(i, dat)
+{
+    g <- mutate(dat, x_to_sqrt_x = sapply(x_int, `[`, i)) %>%
+         ggplot(aes(x_to_sqrt_x, y)) +
+         geom_point() +
+         geom_smooth(method = 'loess', se = FALSE)
+
+    print(g)
+}
+
+if(!file.exists("pow05Video.gif"))
+    saveGIF(map(c(1:60, rep(60, 8), 60:1), plotLine, dat = pow.5), 
+            movie.name = "pow05Video.gif", interval = 0.1, autobrowse = FALSE,
+            ani.width = width, ani.height = height)
+```
+
+![](pow05Video.gif)
+
+# Log Transformations
+
+Original model: y ~ β~0~ + β~1~x + ε
+
+With log transformation: y ~ β~0~ + β~1~ln(x) + ε
+
+```{r lnx, include = FALSE}
+n <- 100
+
+set.seed(923843)
+expx <- data_frame(x = runif(n)*10,
+                   expx = exp(x),
+                   y = x + rnorm(n, 5),
+                   x_int = map2(expx, x, ~ exp(seq(from = log(.x), to = log(.y), len = 60))))
+
+plotLine <- function(i, dat)
+{
+    g <- mutate(dat, x_to_lnx = sapply(x_int, `[`, i)) %>%
+         ggplot(aes(x_to_lnx, y)) +
+         geom_point() +
+         geom_smooth(method = 'loess', se = FALSE)
+
+    print(g)
+}
+
+if(!file.exists("lnxVideo.gif"))
+    saveGIF(map(c(1:60, rep(60, 8), 60:1), plotLine, dat = expx), 
+            movie.name = "lnxVideo.gif", interval = 0.1, autobrowse = FALSE,
+            ani.width = width, ani.height = height)
+```
+
+![](lnxVideo.gif)
+
+# Log Transformations
+
+Original model: y ~ β~0~ + β~1~x + ε
+
+With log transformation: ln(y) ~ β~0~ + β~1~x + ε
+
+```{r lny, include = FALSE}
+n <- 100
+
+set.seed(923843)
+lny <- data_frame(x = runif(n)*10,
+                  expx = exp(x),
+                  y = exp(x + rnorm(n, 5)),
+                  y_int = map2(y, log(y), ~ exp(seq(from = log(.x), to = log(.y), len = 60))))
+
+plotLine <- function(i, dat)
+{
+    g <- mutate(dat, y_to_lny = sapply(y_int, `[`, i)) %>%
+         ggplot(aes(x, y_to_lny)) +
+         geom_point() +
+         geom_smooth(method = 'loess', se = FALSE)
+
+    print(g)
+}
+
+if(!file.exists("lnyVideo.gif"))
+    saveGIF(map(c(1:60, rep(60, 8), 60:1), plotLine, dat = lny), 
+            movie.name = "lnyVideo.gif", interval = 0.1, autobrowse = FALSE,
+            ani.width = width, ani.height = height)
+```
+
+![](lnyVideo.gif)
+
+```{r, include=FALSE}
+############################# Closing ##############################
+```
+

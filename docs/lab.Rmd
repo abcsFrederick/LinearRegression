@@ -1,0 +1,122 @@
+---
+title: "Statistics for Lunch: Linear Regression"
+output: md_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(cowplot)
+library(car)
+library(broom)
+```
+
+```{r include = FALSE}
+# To generate the solution file, set solution to TRUE
+solution <- FALSE
+
+# after knitting this file, rename as README.md and move to the root directory
+```
+
+# Statistics for Lunch: Linear Regression
+
+Welcome to the repository for the linear regression materials for Statistics for Lunch! There are two main branches in this repository:
+
+## Master
+
+The master branch is where the exercises for the hands-on session are located as well as the code used to generate the slides for the lecture.
+
+* Files located in the `docs/` directory were used to generate the lecture slides. The slides are located there as well, but click [here](http://abcsFrederick.github.io/LinearRegression/slides.html) to view the slides.
+
+* More detailed lecture notes can be found [here](https://github.com/abcsFrederick/LinearRegression/blob/master/docs/slideNotes.md) if you missed the lecture portion or wish to review the presentation.
+
+## Solutions
+
+The solutions branch is where solutions to the hands-on practice problems will be deposited.
+
+# Linear Regression Lab
+
+Follwing up on the talk earlier this week, we will practice creating linear regression models, testing model assumptions and correcting failed model assumptions. Each of the data sets we will practice with have different problems that you will need to sort out.
+
+## Example
+
+In this toy example, we have a variable with a non-linear relationship, as well as a couple of variables that are more or less strongly correlated. Note how the tests of our assumptions are affected by these violations.
+
+```{r example}
+require(tidyverse)
+
+# the data
+n <- 500
+
+set.seed(23497)
+dat <- data_frame(x1 = rnorm(100),
+                  x2 = rnorm(100),
+                  x3 = x1 + rnorm(100),
+                  x4 = x3 + rnorm(100),
+                  y = x1 + 2*x2 + x2^2 + x3 + x4 + rnorm(100))
+
+# first model
+model0 <- lm(y ~ x1 + x2 + x3 + x4, data = dat)
+
+# test for linearity
+crPlots(model0)
+
+# test for multivariate normality
+require(broom)
+with(augment(model0), shapiro.test(.std.resid))
+
+qqPlot(model0)
+
+# test for multicollinearity
+vif(model0)
+
+# test for autocorrelation
+durbinWatsonTest(model0)
+
+# test for homoscedasticity
+ncvTest(model0)
+
+spreadLevelPlot(model0)
+```
+
+This model looks nicer:
+
+```{r example fixed}
+model1 <- lm(y ~ x1 + identity(x2^2) + x4, data = dat)
+
+# a couple of tests
+crPlots(model1)
+
+with(augment(model0), shapiro.test(.std.resid))
+
+vif(model1)
+
+# final model results
+summary(model1)
+```
+
+## Height and weight
+
+Here we look at some data for the [!Kung San](https://en.wikipedia.org/wiki/%C7%83Kung_people) people, referenced in [McElreath](http://xcelab.net/rm/statistical-rethinking/).
+
+* Create a statistical model describing your expected relationship between weight and the other variables,
+* Check your model assumptions and revise accordingly.
+
+```{r bmi}
+howell1 <- read_delim('https://raw.githubusercontent.com/rmcelreath/rethinking/master/data/Howell1.csv', ';') %>%
+    mutate(sex = ifelse(male, 'male', 'female'))
+```
+
+## Simulated glomerular filtration rate
+
+In this simulated data set, we are going to explore glomerular filtration rate as a function of age, gender and blood pressure. The gist sourced below will create a data set called `dat`. While the data are simulated (i.e. made up), they were designed to be somewhat typical of what you would observe in real life.
+
+* Create a statistical model describing your expected relationship between  glomerular filtration rate (gfr) and the other variables,
+* Check your model assumptions and revise accordingly.
+
+```{r gfr}
+# this will create a variable called `dat`
+source('https://tinyurl.com/y78ws8gk')
+
+dat
+```
