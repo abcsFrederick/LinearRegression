@@ -351,36 +351,6 @@ summary(homModel)
 summary(hetModel)
 ```
 
-# Assumptions Summary
-
-```{r assumptions}
-# this is the table I want, but I also want some better formatting
-# | Assumption                  | Cause                | Consequence                 | Diagnosis                 |
-# |:----------------------------|:---------------------|:----------------------------|:--------------------------|
-# | Linear Relationship         | Bad model            | Inaccurate predictions      | `car::crPlots()`          |
-# | Multivariate Normality      | Bad model            | Incorrect statistics        | `car::qqPlot()`           |
-# |                             | Noisy data           | (p-values / CIs)            | `shapiro.test(residuals)` |
-# | No/Little Multicollinearity | Correlated variables | Unstable model coefficients | `car::vif()`              |
-# | No Autocorrelation          | Non-independent data | Inefficient estimators      | `car::durbinWatsonTest()` |
-# | Homoscedasticity            | Bad model            | Incorrect statistics        | `car::ncvTest()`          |
-# |                             | "Bad" data           | (p-values / CIs)            | `car::spreadLevelPlot()`  |
-
-tab <- data_frame(Assumption = c('Linear Relationship', 'Multivariate Normality', 'Multivariate Normality', 
-                                 'No/Little Multicollinearity', 'No Autocorrelation', 'Homoscedasticity', 'Homoscedasticity'),
-                  Cause = c('Incorrect model', 'Incorrect model', 'Noisy data', 'Correlated variables', 
-                            'Non-independent data', 'Incorrect model', '"Bad" data'),
-                  Consequence = c('Inaccurate predictions', 'Incorrect statistics', '(p-values / CIs)', 
-                                  'Unstable model coefficients', 'Inefficient estimators', 'Incorrect statistics',
-                                  '(p-values / CIs)'),
-                  Diagnosis = c('car::crPlots()', 'car::qqPlot()', 'shapiro.test(residuals)', 'car::vif()', 
-                                'car::durbinWatsonTest()', 'car::ncvTest()', 'car::spreadLevelPlot()'))
-
-kable(tab) %>%
-    column_spec(column = 4, monospace = TRUE) %>%
-    collapse_rows(columns = 1, valign = 'top') %>%
-    kable_styling()
-```
-
 # Influential Observations
 
 ```{r influence, include = FALSE}
@@ -593,3 +563,43 @@ if(!file.exists("lnyVideo.gif"))
 ############################# Closing ##############################
 ```
 
+# Assumptions Summary
+
+```{r assumptions}
+# this is the table I want, but I also want some better formatting
+# | Assumption                  | Cause                | Consequence                 | Diagnosis                 |
+# |:----------------------------|:---------------------|:----------------------------|:--------------------------|
+# | Linear Relationship         | Bad model            | Inaccurate predictions      | `car::crPlots()`          |
+# | Multivariate Normality      | Bad model            | Incorrect statistics        | `car::qqPlot()`           |
+# |                             | Noisy data           | (p-values / CIs)            | `shapiro.test(residuals)` |
+# | No/Little Multicollinearity | Correlated variables | Unstable model coefficients | `car::vif()`              |
+# | No Autocorrelation          | Non-independent data | Inefficient estimators      | `car::durbinWatsonTest()` |
+# | Homoscedasticity            | Bad model            | Incorrect statistics        | `car::ncvTest()`          |
+# |                             | "Bad" data           | (p-values / CIs)            | `car::spreadLevelPlot()`  |
+
+tab <- data_frame(Assumption = c('Linear Relationship', 'Multivariate Normality', 'Multivariate Normality', 
+                                 'No/Little Multicollinearity', 'No Autocorrelation', 'Homoscedasticity', 'Homoscedasticity'),
+                  Cause = c('Incorrect model', 'Incorrect model', 'Noisy data', 'Correlated variables', 
+                            'Non-independent data', 'Incorrect model', '"Bad" data'),
+                  Consequence = c('Inaccurate predictions', 'Incorrect statistics', '(p-values / CIs)', 
+                                  'Unstable model coefficients', 'Inefficient estimators', 'Incorrect statistics',
+                                  '(p-values / CIs)'),
+                  Diagnosis = c('car::crPlots()', 'car::qqPlot()', 'shapiro.test(residuals)', 'car::vif()', 
+                                'car::durbinWatsonTest()', 'car::ncvTest()', 'car::spreadLevelPlot()'))
+
+kable(tab) %>%
+    column_spec(column = 4, monospace = TRUE) %>%
+    collapse_rows(columns = 1, valign = 'top') %>%
+    kable_styling()
+```
+
+# Thanks
+
+Statistics for Lunch Team
+    * Greg Alvord
+    * Eckart Bindewald
+    * Taina Immonen
+    * Brian Luke
+    * George Nelson
+    * Ravi Ravichandran
+    * Tom Schneider
