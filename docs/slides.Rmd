@@ -21,7 +21,7 @@ library(kableExtra)# for additional kable formatting options
 - Least squares regression intuition
 - Assumptions
     - What are they?
-    - Causes
+    - Causes of assumption violation
     - Consequences
     - Model diagnostics
 - Transformations
@@ -33,39 +33,79 @@ library(kableExtra)# for additional kable formatting options
 # Least Squares Intuition
 
 ```{r intuition data, echo=FALSE}
-## This code is included here to show what I did.
-## The frames created by this chunk were stitched together using Time Lapse Assembler and uploaded to YouTube
+p.platensis <- matrix(c(5.38,	29,
+                        7.36,	23,
+                        6.13,	22,
+                        4.75,	20,
+                        8.10,	25,
+                        8.62,	25,
+                        6.30,	17,
+                        7.44,	24,
+                        7.26,	20,
+                        7.17,	27,
+                        7.78,	24,
+                        6.23,	21,
+                        5.42,	22,
+                        7.87,	22,
+                        5.25,	23,
+                        7.37,	35,
+                        8.01,	27,
+                        4.92,	23,
+                        7.03,	25,
+                        6.45,	24,
+                        5.06,	19,
+                        6.72,	21,
+                        7.00,	20,
+                        9.39,	33,
+                        6.49,	17,
+                        6.34,	21,
+                        6.16,	25,
+                        5.74,	22), 
+                      byrow = TRUE, ncol = 2, dimnames = list(NULL, c('mg', 'eggs'))) %>%
+               as_data_frame()
 
-# data set
+# simulated data set
 set.seed(23048)
 dat <- data_frame(x = rnorm(20)) %>%
        mutate(x = x - mean(x),
               y = x + rnorm(length(x)))
 
 # calculate regression line
-regLine <- lm(y ~ x, data = dat) %>%
+regLine <- lm(eggs ~ mg, data = p.platensis) %>%
            coefficients()
 
 ##### take a look at the data #####
-ggplot(dat, aes(x, y)) + 
+ggplot(p.platensis, aes(mg, eggs)) + 
     geom_point() +
     geom_abline(slope = regLine[2], intercept = regLine[1])
 ```
 
+Sand flea data from [McDonald, J.H. 1989. Selection component analysis of the Mpi locus in the amphipod Platorchestia platensis. Heredity 62: 243-249](https://www.nature.com/articles/hdy198934).
+
+See the [Handbook of Biological Statistics](http://www.biostathandbook.com/linearregression.html) for additional examples.
+
 # Least Squares Intuition
 
 ```{r with error terms, echo=FALSE}
-mutate(dat, 
-       pred = regLine[2]*x + regLine[1],
-       error = pred - y) %>%
-    ggplot(aes(x, y)) + 
+g <- mutate(p.platensis, 
+            pred = regLine[2]*mg + regLine[1],
+           error = pred - eggs) %>%
+     ggplot(aes(mg, eggs)) + 
     
-    geom_segment(aes(xend = x, yend = pred, color = error)) +
-    scale_color_gradient2(low = 'orange', midpoint = 0, mid = 'black', high = 'orange') +
+     geom_segment(aes(xend = mg, yend = pred, color = error)) +
+     scale_color_gradient2(low = 'orange', midpoint = 0, mid = 'black', high = 'orange') +
+     theme(legend.position = 'none') +
     
-    geom_point() +
+     geom_point() +
     
-    geom_abline(slope = regLine[2], intercept = regLine[1])
+     geom_abline(slope = regLine[2], intercept = regLine[1]) +
+    
+     geom_segment(aes(x = 10, xend = 10, y = 17, yend = 63/257*13 + 17), size = 1,
+                  color = rgb(63/257, 63/257*.65, 0)) +
+    
+     geom_text(aes(label = "Sum of Squared Errors", x = 10, y = 17), angle = 90, vjust = 2, hjust = 0)
+
+g
 ```
 
 # Least Squares Intuition
@@ -78,73 +118,262 @@ mutate(dat,
 #' @return the modified data frame with two additional values added: pred (predictions based on ab) and err (the error terms)
 plotLine <- function(m, b, dat)
 {
-    g <- ggplot(mutate(dat,
-                       pred = m*x + b,
-                       error = pred - y),
-                aes(x, y)) +
+    tmp <- mutate(dat,
+                  pred = m*mg + b,
+                  error = pred - eggs)
+    g <- ggplot(tmp, aes(mg, eggs)) +
 
-         geom_segment(aes(xend = x, yend = pred, color = error)) +
-         scale_color_gradient2(low = 'orange', midpoint = 0, mid = 'black', high = 'orange') +
+         geom_segment(aes(xend = mg, yend = pred, color = sqrt(abs(error)))) +
+         scale_color_gradient(low = 'black', 
+                               high = rgb(max(sqrt(abs(tmp$error))) / 3.7, max(sqrt(abs(tmp$error))) / 3.7 * 0.65, 0)) +
+         theme(legend.position = 'none') +
     
          geom_point() +
     
-         geom_abline(slope = m, intercept = b)
+         geom_abline(slope = m, intercept = b) +
+        
+         geom_segment(aes(x = 10, xend = 10, y = 17, yend = (sum(tmp$error^2)-300)/350*13 + 17), size = 1,
+                      color = (rgb(sqrt((sum(tmp$error^2)-300)/257), sqrt((sum(tmp$error^2)-300)/250*.65), 0))) +
+    # going up to orange...                  255 or 1                         165 or 0.65                  0
+    
+         geom_text(aes(label = "Sum of Squared Errors", x = 10, y = 17), angle = 90, vjust = 2, hjust = 0)
     
     print(g)
+    invisible(max(sqrt(abs(tmp$error))))
 }
 
 width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width")
 height <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.height")
 
 if(!file.exists('intuitionVideo.gif')) # this takes a few seconds to render - don't recreate unless we really want to
-    saveGIF(sapply(c(seq(from = regLine[2], to = 0.2, length = 90), # perturb the line
-                     seq(from = 0.2, to = regLine[2], length = 10)),
-                   plotLine, b = regLine[1], dat = dat), 
+    saveGIF(map2(c(seq(from = regLine[2], to = 0.2, length = 90), # perturb the line
+                   seq(from = 0.2, to = regLine[2], length = 10)),# snap back to regression line
+                 c(seq(from = regLine[1], to = 20, length = 90),  # perturb
+                   seq(from = 20, to = regLine[1], length = 10)), # snap back
+                 ~ plotLine(.x, .y, dat = p.platensis)), 
             movie.name = "intuitionVideo.gif", interval = 0.1, autobrowse = FALSE,
             ani.width = width, ani.height = height)
 ```
 
 ![](intuitionVideo.gif)
 
+# Model Notation
+
+eggs = β~0~ + β~1~ mg + ε
+
+```{r model notation}
+g
+```
+
+# Model Output
+
+eggs = β~0~ + β~1~ mg + ε
+
+```{r model output}
+pp0 <- lm(eggs ~ mg, data = p.platensis)
+
+summary(pp0) %>%
+    capture.output() %>%
+    `[`(8:14) %>%
+    cat(sep = '\n')
+```
+
+eggs = ```r round(regLine[1], 1)``` + ```r round(regLine[2], 1)```*mg + ε
+
+
 ```{r, include=FALSE}
 ############################# Assumptions ##############################
+
+########## Assumption 1 - MVN residuals ##########
 ```
 
-# Linear Relationship
+# Assumption 1: Error terms are normally distributed
 
-```{r linear1d}
-set.seed(239478)
+Two ways to test this assumption:
+
+* Shapiro-Wilks test (quantitative, but sensitive to outliers)
+* QQ-plot (graphical test)
+
+```{r shapiro-wilks}
+with(augment(pp0), shapiro.test(.std.resid))
 ```
 
-```{r linear1a, echo=TRUE}
-# some made up data
-linExample <- data_frame(x1 = rnorm(100),
-                         x2 = rnorm(100),
-                         y = x1 + x2^2 + rnorm(100))
+* Null hypothesis: the error terms are normally distributed.
+* Alternate hypothesis: we are violating this assumption.
+    * In this case, large p-values are good news.
+    * Probably won't reject the null hypothesis, but we should exercise caution.
+
+See my code and `?shapiro.test` for more details.
+
+# Assumption 1: Error terms are normally distributed
+
+```{r outlierTest}
+outlierTest(pp0)
 ```
 
-```{r linear1b, fig.width=4}
-ggplot(linExample, aes(x1, y)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se = FALSE)
+* Null hypothesis: the data point is not an outlier.
+    * Again, large p-values are good news.
+    * Result is borderline significant, so we will evaluate this a little closer.
 
-ggplot(linExample, aes(x2, y)) +
-    geom_point() +
-    geom_smooth(method = 'lm', formula = y ~ identity(x^2), se = FALSE)
+See my code and `?outlierTest` from the `car` package for more details.
+
+# Influence
+
+```{r influence1}
+# Function to calculate predicted value and error terms
+#' @param x x position
+#' @param y y position
+#' @param dat the data frame containing the rest of the data set
+plotLine <- function(x, y, dat)
+{
+    dat$mg[24] <- x
+    dat$eggs[24] <- y
+    
+    mdl <- lm(eggs ~ mg, data = dat)
+    
+    g <- ggplot(dat[-24,], aes(mg, eggs)) +
+         geom_point() +
+         #geom_smooth(method = 'lm', se = FALSE) +
+        
+         ylim(c(17, 35)) +
+         xlim(c(4.7, 9.4)) +
+        
+         geom_abline(slope = regLine[2], intercept = regLine[1], linetype = 'dashed') +
+         geom_abline(slope = coef(mdl)[2], intercept = coef(mdl)[1], color = 'blue') +
+        
+         geom_point(data = data_frame(x = x, y = y), aes(x, y), color = 'red')
+    
+    print(g)
+}
+
+plotLine(9.39, 33, p.platensis)
 ```
 
-# Linear Relationship - Component Residual Plots
+# Influence
 
-```{r linear2, fig.height=4}
-# two models, same data
-# model 1 breaks linearity assumption, model 2 does not
-model1 <- lm(y ~ x1 + x2, data = linExample)
-model2 <- lm(y ~ x1 + identity(x2^2), data = linExample)
+```{r influence, include = FALSE}
+width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width")
+height <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.height")
 
-# Component - Residual Plots will give us a graphical
-# check of the linearity assumption
-crPlots(model1)
-crPlots(model2)
+if(!file.exists('influenceVideo.gif')) # this takes a few seconds to render - don't recreate unless we really want to
+    saveGIF(map2(c(rep(9.39, 6),                             # (x) up to top right corner
+                   seq(from = 9.39, to = 4.75, length = 50), # (x) over to top left corner
+                   rep(4.75, 50),                            # (x) down to bottom left corner
+                   seq(from = 4.75, to = 9.39, length = 50), # (x) over to bottom right corner
+                   rep(9.39, 44)),                           # (x) back to starting point
+                 c(seq(from = 33, to = 35, length = 6),      # (y) up to top right corner
+                   rep(35, 50),                              # (y) over to top left corner
+                   seq(from = 35, to = 17, length = 50),     # (y) down to bottom left corner
+                   rep(17, 50),                              # (y) over to bottom right corner
+                   seq(from = 17, to = 33, length = 44)),    # (y) back to starting point
+                 plotLine, dat = p.platensis), 
+            movie.name = "influenceVideo.gif", interval = 0.1, autobrowse = FALSE,
+            ani.width = width, ani.height = height)
+```
+
+![](influenceVideo.gif)
+
+# Influence
+
+```{r influencePlot}
+par(cex.lab = 1.5, cex.axis = 1.25)
+capture.output(influencePlot(pp0), file = '/dev/null')
+```
+
+* Studentized Residuals (y-axis): The number of standard deviations away from the trend line for each data point.
+* Hat-Values (x-axis): A measure of how much the coefficients change (i.e. slope and intercept) if you exclude each data point. Vertical reference lines are drawn at twice and three times the average hat value.
+* Cook's Distance (radius of bubbles): A measure of how much the error terms would change when excluding each data point.
+
+We see our borderline significant outlier (#16) has very little influence over the coefficients, but it does result in a change in the error terms.
+
+    * The trend line is not changed much if we exclude this data point from the analysis.
+    * It does shift the line slightly up, which results in a slightly larger estimate for all data points.
+    
+The 24th data point is also highlighted here. It has a larger residual (not an outlier) and is on the edge of the distribution. This gives it increased leverage and influence.
+
+See my code and `?influencePlot` from the `car` package for more details.
+
+# Assumption 1: Error terms are normally distributed
+
+```{r qqPlot}
+par(cex.lab = 1.5, cex.axis = 1.25)
+qqPlot(pp0, ylab = 'Studentized Residuals')
+```
+
+* Studentized Residuals (y-axis): The number of standard deviations away from the trend line for each data point. Error terms are ordered from lest (bottom left corner) to greatest (top right corner).
+* t Quantiles (x-axis): The theoretical size of the residuals if the error terms perfectly followed a normal distribution.
+* Solid line: If the error terms were perfectly normally distributed, all of the data points would lie along this line.
+* Dashed lines: This region shows where we can expect the observed error terms to fall, given sampling variability.
+
+We see our borderline outlier in the top right corner is larger than we would expect it to be, but not quite outside of the confidence region within which we can expect our error terms to fall.
+
+See my code and `?qqPlot` from the `car` package for more details.
+
+```{r, include = FALSE}
+########## Assumption 2 - Linearity ##########
+```
+
+# Assumption 2: Linear Relationship
+
+size = β~0~ + β~1~ length + ε
+
+size = β~0~ + β~1~ length + β~2~ length^2^ + ε
+
+```{r ashton data}
+# I used a ruler to guestimate these values from Figure 2 of Ashton 2007 referenced below - probably not terribly accurate, but sufficient for this example
+ashton <- data_frame(size = c(3, 2, 7, 11, 12, 10, 8, 9, 10, 13, 9, 7, 6, 13, 8, 2), # clutch size determined by x-ray imaging
+                     length = c(284, 290, 290, 298, 299, 302, 306, 309, 310, 311, 
+                                317, 317, 320, 323, 334, 334)) %>%                   # female carapace length in mm
+          mutate(length2 = length^2)
+
+ggplot(ashton, aes(length, size)) + 
+    geom_point() + 
+    geom_smooth(method = 'lm', se = FALSE) +
+    geom_smooth(method = 'lm', se = FALSE, formula = y ~ x + identity(x^2), color = 'green4') +
+    ylab("Clutch Size") +
+    xlab("Carapace Length (mm)")
+```
+
+Data from [Ashton, K.G., R.L. Burke, and J.N. Layne. 2007. Geographic variation in body and clutch size of gopher tortoises. Copeia 2007: 355-363](http://www.asihcopeiaonline.org/doi/abs/10.1643/0045-8511(2007)7%5B355:GVIBAC%5D2.0.CO%3B2?code=asih-site)
+
+# Assumption 2: Linear Relationship
+
+size = β~0~ + β~1~ length + ε
+
+```{r linear candidates1}
+ash0 <- lm(size ~ length, data = ashton)
+    
+summary(ash0) %>%
+    capture.output() %>%
+    `[`(8:12) %>%
+    cat(sep = '\n')
+```
+
+size = β~0~ + β~1~ length + β~2~ length^2^ + ε
+
+```{r linear candidates2}
+ash1 <- lm(size ~ length + length2, data = ashton)
+
+summary(ash1) %>%
+    capture.output() %>%
+    `[`(8:15) %>%
+    cat(sep = '\n')
+```
+
+# Component Residual Plots
+
+size = β~0~ + β~1~ length + ε
+
+```{r crPlots1}
+crPlots(ash0)
+```
+
+# Component Residual Plots
+
+size = β~0~ + β~1~ length + β~2~ length^2^ + ε
+
+```{r crPlots2}
+crPlots(ash1)
 ```
 
 # Multivariate Normality
@@ -351,68 +580,6 @@ summary(homModel)
 summary(hetModel)
 ```
 
-# Influential Observations
-
-```{r influence, include = FALSE}
-set.seed(23984)
-infl <- data_frame(x = rnorm(50),
-                   y = x + rnorm(50)) %>%
-        filter(y < max(y) & y > min(y)) # replace this one with the moving point
-
-# Function to calculate predicted value and error terms
-#' @param x x position
-#' @param y y position
-#' @param dat the data frame containing the rest of the data set
-plotLine <- function(x, y, dat)
-{
-    dat <- bind_rows(dat, data_frame(x = x, y = y))
-    
-    mdl <- lm(y ~ x, data = dat)
-    
-    g <- ggplot(dat, aes(x, y)) +
-         geom_point() +
-         # geom_smooth(method = 'lm', se = FALSE) +
-        
-         ylim(c(-3.2, 4)) +
-         xlim(c(-2.4, 2.4)) +
-        
-         geom_abline(slope = coef(mdl)[2], intercept = coef(mdl)[1], color = 'blue') +
-        
-         geom_point(data = data_frame(x = x, y = y), aes(x, y), color = 'red')
-    
-    print(g)
-}
-
-width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width")
-height <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.height")
-
-if(!file.exists('influenceVideo.gif')) # this takes a few seconds to render - don't recreate unless we really want to
-    saveGIF(map2(c(rep(2.4, 20), seq(from = 2.4, to = -2.4, length = 100), rep(-2.4, 30)), # x
-                 c(seq(from = 2.4, to = 4, length = 20), rep(4, 100), seq(from = 4, to = -2.4, length = 30)), # y
-                 plotLine, dat = infl), 
-            movie.name = "influenceVideo.gif", interval = 0.1, autobrowse = FALSE,
-            ani.width = width, ani.height = height)
-```
-
-![](influenceVideo.gif)
-
-# Influential Observations (good)
-
-```{r influence tests}
-mdl <- lm(y ~ x, data = infl)
-
-outlierTest(mdl)
-influencePlot(mdl)
-```
-
-# Influential Observations (bad)
-
-```{r influence tests2}
-mdl <- lm(y ~ x, data = bind_rows(infl, data_frame(x = -2.4, y = 4)))
-
-outlierTest(mdl)
-influencePlot(mdl)
-```
 
 ```{r, include=FALSE}
 ############################# Transformations ##############################
