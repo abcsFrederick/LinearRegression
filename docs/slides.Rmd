@@ -376,76 +376,73 @@ size = β~0~ + β~1~ length + β~2~ length^2^ + ε
 crPlots(ash1)
 ```
 
-# Multivariate Normality
 
-```{r mvn1a}
-set.seed(234987)
+```{r include=FALSE}
+########## Assumption 3: No/Little Multicollinearity ##########
+
+# data from Gavish 2008 - extracted from figure 1 using pencil and ruler technique
+#                 DBP, SBP, Time (24 hour)
+bpTime <- matrix(c(56,  94, 17  ,
+                   57,  94, 21  ,
+                   59, 100, 20.5,
+                   59, 104, 17.5,
+                   60, 101, 16  ,
+                   58, 109, 22  ,
+                   61, 110, 21.5,
+                   62, 112, 18.5,
+                   63, 106, 18  ,
+                   66, 111, 15.5,
+                   66, 104, 19  ,
+                   69, 107, 19.5,
+                   69, 119, 16.5,
+                   71, 121, 22.5,
+                   74, 117, 20  ,
+                   74, 121, 23  ,
+                   85, 115,  4.5,
+                   95, 158, 25  ,
+                   82, 161, 10.5,
+                   88, 156,  9  ,
+                   98, 142, 24.5,
+                   88, 142, 25.5,
+                   81, 139, 26  ,
+                   77, 143, 26.5,
+                   93, 141, 13.5,
+                   74, 143,  1.5,
+                   75, 131,  4  ,
+                   75, 131,  5  ,
+                   77, 132, 15  ,
+                   78, 136,  1  ,
+                   77, 138, 11  ,
+                   85, 111,  6.5,
+                   77, 122, 23.5,
+                   79, 121, 24  ,
+                   79, 122, 10  ,
+                   75, 122,  2  ,
+                   77, 124,  7  ,
+                   79, 127,  2.5,
+                   81, 122,  3  ,
+                   82, 125,  6  ,
+                   88, 146, 12  ,
+                   86, 143,  0  ,
+                   86, 141,  8.5,
+                   86, 144, 14  ,
+                   83, 144,  9.5,
+                   85, 140, 12.5,
+                   82, 139,  3.5,
+                   83, 138,  5.5,
+                   81, 135,  0.5,
+                   83, 137,  7.5,
+                   82, 136, 11.5,
+                   86, 136, 14.5,
+                   85, 132, 13,
+                   83, 132,  8  ),
+                 byrow = TRUE, ncol = 3, dimnames = list(NULL, c('dbp', 'sbp', 'time'))) %>%
+         as_data_frame() %>%
+         arrange(time)
+
+
 ```
 
-```{r mvn1b, echo=TRUE}
-mvnExample <- data_frame(x1 = rnorm(100),
-                         y1 = x1 + rnorm(100), # normal error terms
-                         y2 = x1 + rt(100, 3)) # not-normal error terms
-```
-
-```{r mvn1, fig.width=4}
-ggplot(mvnExample, aes(x1, y1)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se = FALSE) +
-    ylim(range(mvnExample$y2))
-
-ggplot(mvnExample, aes(x1, y2)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se = FALSE)
-```
-
-# Multivariate Normality - Diagnostics (good)
-
-```{r mvn2}
-mvnModel1 <- lm(y1 ~ x1, data = mvnExample)
-
-qqPlot(mvnModel1)
-with(augment(mvnModel1), shapiro.test(.std.resid))
-```
-
-# Multivariate Normality - Diagnostics (bad)
-
-```{r mvn3}
-mvnModel2 <- lm(y2 ~ x1, data = mvnExample)
-
-qqPlot(mvnModel2)
-with(augment(mvnModel2), shapiro.test(.std.resid))
-```
-
-# Multivariate Normality - Model comparison
-
-Model 1 has normal error terms.
-
-```{r mvn4a}
-summary(mvnModel1)
-```
-
-```{r expected r2, eval = FALSE, echo=FALSE}
-set.seed(230948)
-data_frame(x = lapply(rep(100, 100000), rnorm),
-           y = map(x, ~ .x + rnorm(100)),
-           r2 = map2(x, y, ~ cor(.x, .y)^2)) %>%
-    select(r2) %>%
-    unlist() %>%
-    summary() # expect R^2 = 0.5
-```
-
-# Multivariate Normality - Model comparison
-
-Model 2 has non-normal error terms.
-
-```{r mvn4b}
-summary(mvnModel2)
-```
-
-* Residuals have a much larger spread,
-* Standard error is much larger,
-* R^2^ is much lower.
 
 # No/Little Multicollinearity
 
