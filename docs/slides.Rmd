@@ -14,6 +14,10 @@ library(car)       # for linear regression diagnostics
 library(broom)     # for `augment()`
 library(knitr)     # for `kable()`
 library(kableExtra)# for additional kable formatting options
+
+# see my colorblind_palettes.R gist at https://gist.github.com/johnsonra/89e06c1089471c8055e8d8f8af20955e
+cbpalette <- c("#016E82", "#8115A0", "#005AC8", "#00A0FA", "#F978FA", "#18D2DC", "#AA093C", "#FA7850", 
+               "#10B45A", "#F0F031", "#A1FA82", "#FAE6BE")
 ```
 
 # Overview
@@ -21,7 +25,7 @@ library(kableExtra)# for additional kable formatting options
 - Least squares regression intuition
 - Assumptions
     - What are they?
-    - Causes of assumption violation
+    - Causes of violations of assumptions
     - Consequences
     - Model diagnostics
 - Transformations
@@ -64,12 +68,6 @@ p.platensis <- matrix(c(5.38,	29,
                       byrow = TRUE, ncol = 2, dimnames = list(NULL, c('mg', 'eggs'))) %>%
                as_data_frame()
 
-# simulated data set
-set.seed(23048)
-dat <- data_frame(x = rnorm(20)) %>%
-       mutate(x = x - mean(x),
-              y = x + rnorm(length(x)))
-
 # calculate regression line
 regLine <- lm(eggs ~ mg, data = p.platensis) %>%
            coefficients()
@@ -87,30 +85,6 @@ See the [Handbook of Biological Statistics](http://www.biostathandbook.com/linea
 # Least Squares Intuition
 
 ```{r with error terms, echo=FALSE}
-g <- mutate(p.platensis, 
-            pred = regLine[2]*mg + regLine[1],
-           error = pred - eggs) %>%
-     ggplot(aes(mg, eggs)) + 
-    
-     geom_segment(aes(xend = mg, yend = pred, color = error)) +
-     scale_color_gradient2(low = 'orange', midpoint = 0, mid = 'black', high = 'orange') +
-     theme(legend.position = 'none') +
-    
-     geom_point() +
-    
-     geom_abline(slope = regLine[2], intercept = regLine[1]) +
-    
-     geom_segment(aes(x = 10, xend = 10, y = 17, yend = 63/257*13 + 17), size = 1,
-                  color = rgb(63/257, 63/257*.65, 0)) +
-    
-     geom_text(aes(label = "Sum of Squared Errors", x = 10, y = 17), angle = 90, vjust = 2, hjust = 0)
-
-g
-```
-
-# Least Squares Intuition
-
-```{r intuition video, include=FALSE}
 # Function to calculate predicted value and error terms
 #' @param m the slope of the line
 #' @param b the intercept of the line
@@ -120,28 +94,56 @@ plotLine <- function(m, b, dat)
 {
     tmp <- mutate(dat,
                   pred = m*mg + b,
-                  error = pred - eggs)
+                  error = abs(pred - eggs))
+    
+    # color of the sum of squared errors bar                           
+    err <- sum(tmp$error^2)
+                                                         # red ranges from
+    red <- ifelse(err < 428,                             #   0 to
+                 0,                                      #   0 to
+                 (err - 428)/129 * (250/255))            # 250
+                  
+                                                         # green ranges from
+    grn <- ifelse(err < 428,                             #   0 to
+                 (err - 362.8)/66 * (160/255),           # 160 to
+                 (557 - err)/129 * ( 40/255) + 120/255)  # 120
+                  
+                                                         # blue ranges from
+    blu <- ifelse(err < 428,                             #   0 to
+                 (err - 362.8)/66 * (250/255),           # 250 to
+                 (557 - err)/129 * (170/255) + 80/255)   #  80
+                  
+    col <- try(rgb(red, grn, blu))
+    if(class(col) == 'try-error')
+        stop(paste0('m=', m, ', and b=', b, " are causing an error"))
+
+    # generate figure        
     g <- ggplot(tmp, aes(mg, eggs)) +
 
-         geom_segment(aes(xend = mg, yend = pred, color = sqrt(abs(error)))) +
-         scale_color_gradient(low = 'black', 
-                               high = rgb(max(sqrt(abs(tmp$error))) / 3.7, max(sqrt(abs(tmp$error))) / 3.7 * 0.65, 0)) +
+         geom_segment(aes(xend = mg, yend = pred, color = sqrt(error))) +
+         scale_color_gradientn(colours = c('black', cbpalette[c(4,8)])) +
          theme(legend.position = 'none') +
     
          geom_point() +
     
          geom_abline(slope = m, intercept = b) +
         
-         geom_segment(aes(x = 10, xend = 10, y = 17, yend = (sum(tmp$error^2)-300)/350*13 + 17), size = 1,
-                      color = (rgb(sqrt((sum(tmp$error^2)-300)/257), sqrt((sum(tmp$error^2)-300)/250*.65), 0))) +
-    # going up to orange...                  255 or 1                         165 or 0.65                  0
+         geom_segment(aes(x = 10, xend = 10, y = 17, yend = (err-300)/350*13 + 17), size = 1,
+                      color = col) +
     
          geom_text(aes(label = "Sum of Squared Errors", x = 10, y = 17), angle = 90, vjust = 2, hjust = 0)
     
+    # plot figure
     print(g)
-    invisible(max(sqrt(abs(tmp$error))))
+    invisible(g)
 }
 
+g <- plotLine(regLine[2], regLine[1], p.platensis)
+```
+
+# Least Squares Intuition
+
+```{r intuition video, include=FALSE}
 width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width")
 height <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.height")
 
