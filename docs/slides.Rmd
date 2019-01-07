@@ -1,12 +1,13 @@
 ---
 title: "Linear Regression"
 author: "Randy Johnson"
-date: "6/21/2018"
+date: "1/7/2019"
 output: slidy_presentation
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(MASS)      # for parallel coordinates plots
 library(tidyverse) # for data wrangling etc...
 library(cowplot)   # for nicer ggplot defaults
 library(animation) # for animated gifs
@@ -144,7 +145,7 @@ g <- plotLine(regLine[2], regLine[1], p.platensis)
 # Least Squares Intuition
 
 ```{r intuition video, include=FALSE}
-width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width")
+width <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.width") * 1.15
 height <- knitr::opts_chunk$get("dpi") * knitr::opts_chunk$get("fig.height")
 
 if(!file.exists('intuitionVideo.gif')) # this takes a few seconds to render - don't recreate unless we really want to
@@ -208,6 +209,8 @@ with(augment(pp0), shapiro.test(.std.resid))
 See my code and `?shapiro.test` for more details.
 
 # Assumption 1: Error terms are normally distributed
+
+* Check for outliers:
 
 ```{r outlierTest}
 outlierTest(pp0)
@@ -378,210 +381,156 @@ size = β~0~ + β~1~ length + β~2~ length^2^ + ε
 crPlots(ash1)
 ```
 
-# Multivariate Normality
+# Assumption 2: Linear Relationship
 
-```{r mvn1a}
-set.seed(234987)
+How might you analyze data with a non-linear relationship?
+
+* Transform the data to make it linear
+* Add terms to the model (e.g. to model polynomials)
+* Non-linear regression
+
+```{r, include = FALSE}
+########## Assumption 3 - Little/No Multicollinearity ##########
 ```
 
-```{r mvn1b, echo=TRUE}
-mvnExample <- data_frame(x1 = rnorm(100),
-                         y1 = x1 + rnorm(100), # normal error terms
-                         y2 = x1 + rt(100, 3)) # not-normal error terms
+# Assumption 3: No/Little Multicollinearity
+
+```{r mcol1a, echo = FALSE, warning = FALSE, message = FALSE}
+# Download the data from https://www.kaggle.com/uciml/breast-cancer-wisconsin-data/downloads/data.csv/2
+# and place in ../data/bc.csv
+
+(bc <- read_csv('../data/bc.csv') %>%
+       mutate(metastatic = diagnosis == "M") %>%
+       select(-id, -X33, -diagnosis))
 ```
 
-```{r mvn1, fig.width=4}
-ggplot(mvnExample, aes(x1, y1)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se = FALSE) +
-    ylim(range(mvnExample$y2))
+Breast cancer data from the [UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Breast+Cancer+Wisconsin+%28Diagnostic%29). 
 
-ggplot(mvnExample, aes(x1, y2)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se = FALSE)
-```
+See this [kaggle notebook by Mike M. Lee](https://www.kaggle.com/leemun1/predicting-breast-cancer-logistic-regression) for a more thorough exploration of this dataset.
 
-# Multivariate Normality - Diagnostics (good)
-
-```{r mvn2}
-mvnModel1 <- lm(y1 ~ x1, data = mvnExample)
-
-qqPlot(mvnModel1)
-with(augment(mvnModel1), shapiro.test(.std.resid))
-```
-
-# Multivariate Normality - Diagnostics (bad)
-
-```{r mvn3}
-mvnModel2 <- lm(y2 ~ x1, data = mvnExample)
-
-qqPlot(mvnModel2)
-with(augment(mvnModel2), shapiro.test(.std.resid))
-```
-
-# Multivariate Normality - Model comparison
-
-Model 1 has normal error terms.
-
-```{r mvn4a}
-summary(mvnModel1)
-```
-
-```{r expected r2, eval = FALSE, echo=FALSE}
-set.seed(230948)
-data_frame(x = lapply(rep(100, 100000), rnorm),
-           y = map(x, ~ .x + rnorm(100)),
-           r2 = map2(x, y, ~ cor(.x, .y)^2)) %>%
-    select(r2) %>%
-    unlist() %>%
-    summary() # expect R^2 = 0.5
-```
-
-# Multivariate Normality - Model comparison
-
-Model 2 has non-normal error terms.
-
-```{r mvn4b}
-summary(mvnModel2)
-```
-
-* Residuals have a much larger spread,
-* Standard error is much larger,
-* R^2^ is much lower.
-
-# No/Little Multicollinearity
-
-```{r mcol1a}
-set.seed(239)
-```
-
-```{r mcol1b, echo = TRUE}
-mcol <- data_frame(x1 = rnorm(100),
-                   x2 = x1 + rnorm(100), # x1 and x2 are correlated
-                   x3 = rnorm(100),
-                   y = x1 + x2 + x3 + rnorm(100))
-
-# three models
-model1 <- lm(y ~ x1 + x2 + x3, data = mcol) # everything
-model2 <- lm(y ~ x1 +      x3, data = mcol) # without x2
-model3 <- lm(y ~      x2 + x3, data = mcol) # without x1
-```
-
-# No/Little Multicollinearity - Variance Inflation Factors
+# Assumption 3: No/Little Multicollinearity
 
 ```{r vif, echo = TRUE}
 # check for multicollinearity
-vif(model1)
-vif(model2)
-vif(model3)
+glm(metastatic ~ radius_mean + perimeter_mean + area_mean + texture_mean + smoothness_mean + concavity_mean, data = bc) %>%
+    vif()
 ```
 
-# No/Little Multicollinearity - Model comparison
+# Assumption 3: No/Little Multicollinearity
 
-```{r mcol table}
-data_frame(model = cell_spec(1:3, align = 'center'),
-           x1 = {c(round(coef(model1)[2], 2),
-                   round(coef(model2)[2], 2),
-                   "") %>%
-                 cell_spec(align = 'left')},
-           x2 = {c(round(coef(model1)[3], 2),
-                   "",
-                   round(coef(model3)[2], 2)) %>%
-                 cell_spec(align = 'left')},
-           x3 = {c(round(coef(model1)[4], 2),
-                   round(coef(model2)[3], 2),
-                   round(coef(model3)[3], 2)) %>%
-                 cell_spec(align = 'left')},
-           r2 = {c(round(summary(model1)$r.squared, 2),
-                   round(summary(model2)$r.squared, 2),
-                   round(summary(model3)$r.squared, 2)) %>%
-                 cell_spec(align = 'left')}) %>%
-    
-    kable(escape = FALSE) %>%
-    kable_styling()
+```{r Demensionality Reduction, include = FALSE}
+# Reduce dimensionality with Principal Components Analysis
+pca <- select(bc, -metastatic) %>%
+       prcomp(scale. = TRUE)
+
+# We can capture 80% of the variability of 30 variables with 11 PCs
+sum((cumsum(pca$sdev) / sum(pca$sdev)) < .8)
+
+# pull out principal components
+bc_dr <- cbind(bc, predict(pca, bc)[,1:11])
+
+# parallel coordinates plot
+pcs <- paste0('PC', 1:11)
+
+clrs <- mutate(bc_dr,
+               centr1 = radius_mean - min(radius_mean),
+               scale1 = centr1 / max(centr1),
+               col1 = rgb(scale1, scale1 * 165/255, 0), # scale from black to orange
+               centr2 = perimeter_mean - min(perimeter_mean),
+               scale2 = centr2 / max(centr2),
+               col2 = rgb(sqrt(scale1), sqrt(scale2 * 165/255), 0, .5), # scale from black to orange
+               centr3 = area_mean - min(area_mean),
+               scale3 = centr3 / max(centr3),
+               col3 = rgb(scale1, scale3 * 165/255, 0)) # scale from black to orange
+parcoord(bc_dr[,pcs], col = clrs$col3)
+
+ggplot(bc_dr, aes(PC1, PC2)) +
+    geom_point() +
+    scale_color_manual(values = clrs$col2)
+
+with(bc_dr, plot(PC1, PC2, col = clrs$col2, pch = 19, bty = 'l'))
 ```
 
-Model coefficients for our three models. Notice how the coefficient for `x3` doesn't change much, but the coefficients for `x1`, `x2` and R^2^ change quite a bit.
+Options:
 
-# No Autocorrelation
+* Reduce the number of variables in the model
+    * Pro: model statistics will behave better
+    * Con: might loose some predictive power
+* Reduce dimensionality using PCA
+    * Pro: can include information from all variables
+    * Con: interpretation of model statistics will be hard
+* Leave everything in the model
+    * Pro: can include all variables
+    * Con: model statistics will behave badly
+    * Con: too many variables will cause overfitting
+* Penalized regression
+* Random forests
 
-```{r auto1}
-set.seed(2347890)
-dat <- data_frame(x1 = seq(1, 20, length = 200),
-                  y1 = sin(x1) + 0.1*x1 + rnorm(200))
-
-ggplot(dat, aes(x1, y1)) +
-     geom_point()
+```{r, include = FALSE}
+########## Assumption 4 - No Autocorrelation ##########
 ```
 
-# No Autocorrelation
+# Assumption 4: No Autocorrelation
 
-```{r auto2}
-ggplot(dat, aes(x1, y1)) +
-     geom_point() +
-     geom_smooth(span = .3, method = 'loess', se = FALSE)
+```{r auto1, message=FALSE}
+# measles incidence in Baltimore between 1948 and 1987
+measles <- read_delim(url("http://ms.mcmaster.ca/~bolker/measdata/baltmeas.dat"), ' ', col_names = FALSE) %>%
+           rename(dt = X1, Incidence = X2)
+
+ggplot(measles, aes(dt, Incidence)) +
+    geom_line() +
+    xlab("Year") +
+    ylab("Measles Incidence")
 ```
 
-Adding a loess smoother highlights this periodic pattern in the data.
+Data on measles incidence in Baltimore were collected from published reports by various people and hosted by Ben Bolker at [McMaster University](http://ms.mcmaster.ca/~bolker/measdata.html).
 
-# No Autocorrelation
+# Assumption 4: No Autocorrelation
 
 ```{r auto3, echo=TRUE}
-lm(y1 ~ x1, data = dat) %>%
+lm(Incidence ~ dt, data = measles) %>%
     durbinWatsonTest()
 ```
 
-# Homoscedasticity
 
-```{r homo1, fig.width=4}
-set.seed(234897)
-dat <- data_frame(x1 = rnorm(200) + 3,
-                  y1 = .25*x1 + rnorm(200),
-                  y2 = abs(rnorm(200)*x1))
-
-homModel <- lm(y1 ~ x1, data = dat)
-hetModel <- lm(y2 ~ x1, data = dat)
-
-ggplot(dat, aes(x1, y1)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se=FALSE)
-
-ggplot(dat, aes(x1, y2)) +
-    geom_point() +
-    geom_smooth(method = 'lm', se=FALSE)
+```{r, include = FALSE}
+########## Assumption 5 - Errors are Homoscedastic ##########
 ```
 
-# Homoscedasticity
+# Assumption 5: Homoscedasticity
 
-`y1 ~ x1`
+```{r homo1, message=FALSE}
+# height <- read_csv('../data/NHIS 2007 data.csv') %>%
+#           filter(SEX == 2 & weight < 600 & height < 80)
+#Height/weight data from the CDC's [National Health Interview Survey](https://www.cdc.gov/nchs/nhis/index.htm).
 
-```{r homo2}
-spreadLevelPlot(homModel)
-ncvTest(homModel) # y1 ~ x1
+height <- read_delim(url("https://raw.githubusercontent.com/rmcelreath/rethinking/master/data/Howell1.csv"), ';') %>%
+          filter(male == 0)
+
+ggplot(height, aes(height, weight)) +
+    geom_jitter()
+
+mdl1 <- lm(weight ~ height, data = height)
+# mdl2 <- lm(weight ~ height + age, data = height)
 ```
 
-# Homoscedasticity
+These are [partial census data](https://github.com/rmcelreath/rethinking/blob/master/data/Howell1.csv) for females in the Dobe area !Kung San, compiled from interviews conducted by Nancy Howell in the late 1960s.
 
-`y2 ~ x1`
 
-```{r homo3}
-spreadLevelPlot(hetModel)
-ncvTest(hetModel) # y2 ~ x1
+# Assumption 5: Homoscedasticity
+
+```{r homo2, message=FALSE}
+spreadLevelPlot(mdl1)
+ncvTest(mdl1)
 ```
 
+# Assumption 5: Homoscedasticity
 
-# Homoscedasticity
+How might you model heteroscedastic data?
 
-```{r homo4}
-summary(homModel)
-```
-
-# Homoscedasticity
-
-```{r homo5}
-summary(hetModel)
-```
-
+* Transform the data (usually log or power transformation)
+* Add terms to the model
+* Weighted regression analysis
 
 ```{r, include=FALSE}
 ############################# Transformations ##############################
@@ -728,6 +677,7 @@ if(!file.exists("lnyVideo.gif"))
 
 ![](lnyVideo.gif)
 
+
 ```{r, include=FALSE}
 ############################# Closing ##############################
 ```
@@ -748,8 +698,8 @@ if(!file.exists("lnyVideo.gif"))
 
 tab <- data_frame(Assumption = c('Linear Relationship', 'Multivariate Normality', 'Multivariate Normality', 
                                  'No/Little Multicollinearity', 'No Autocorrelation', 'Homoscedasticity', 'Homoscedasticity'),
-                  Cause = c('Incorrect model', 'Incorrect model', 'Noisy data', 'Correlated variables', 
-                            'Non-independent data', 'Incorrect model', '"Bad" data'),
+                  Cause = c('Bad model', 'Bad model', 'Noisy data', 'Correlated variables', 
+                            'Non-independent data', 'Bad model', '"Bad" data'),
                   Consequence = c('Inaccurate predictions', 'Incorrect statistics', '(p-values / CIs)', 
                                   'Unstable model coefficients', 'Inefficient estimators', 'Incorrect statistics',
                                   '(p-values / CIs)'),
@@ -765,6 +715,7 @@ kable(tab) %>%
 # Thanks
 
 Statistics for Lunch Team
+
     * Greg Alvord
     * Eckart Bindewald
     * Taina Immonen
@@ -772,3 +723,5 @@ Statistics for Lunch Team
     * George Nelson
     * Ravi Ravichandran
     * Tom Schneider
+    
+See [https://github.com/abcsFrederick/LinearRegression](https://github.com/abcsFrederick/LinearRegression) for code.

@@ -13,7 +13,7 @@ This presentation is broken into three major parts:
 
 ### Slide 1
 
-* This is a data set I made up to show how least squares regression works.
+* Our first example data set consists of the size of female sand fleas and the number of eggs she is carrying.
 * The regression line here minimizes the error terms - that is, the distance from each point to the regression line.
 
 ### Slide 2
@@ -21,8 +21,9 @@ This presentation is broken into three major parts:
 * Here we have added a visual representation of the error terms.
 * The error terms in a regression are the distance between the predicted value for `y` and the observed value for `y`.
 * In this figure, we have colored the error terms based on how far away from the regression line they lie.
-    * Those with bright orange coloring are further away from the regression line, 
-    * and those with darker/black coloring are closer to the regression line.
+    * Those with bright orange coloring are furthest away from the regression line, 
+    * those with colored blue are at moderate distances from the regression line,
+    * and those with darker/black coloring are closest to the regression line.
 * In least squares regression, the line that minimizes the sum of the total squared error terms is the solution.
 
 #### Minimization of error
@@ -54,7 +55,11 @@ The first assumption we discuss here is that there is a linear relationship betw
 
 In this data set, the relationship between `x1` and `y` is linear, but the relationship between `x2` and `y` is quadratic.
 
+<<<<<<< Updated upstream
 #### Component Residual Plots
+=======
+### Component Residual Plots
+>>>>>>> Stashed changes
 
 A Component Residual Plot shows the relationship between each independent variable and the dependent variable after conditioning on all the other dependent variables in the model.
 
@@ -103,6 +108,7 @@ Again, we have the expected distribution of the error terms (on the x-axis) plot
 | Expected | 1.00     | 0.10 | 0.500 |
 | 1 (MVN)  | 0.91     | 0.09 | 0.504 |
 | 2 (t~3~) | 0.80     | 0.18 | 0.166 |
+<<<<<<< Updated upstream
 
 ### No/Little Multicollinearity
 
@@ -158,3 +164,5 @@ Here we have the results of `car:outlierTest()` and `car:influencePlot()` for a 
 * Studentized Residuals (y-axis): a standardized measure of the residuals. The 20th data point is about 3.4 standard deviations away from the predicted value.
 * Hat values (x-axis): gives a measure of how much the regression coefficients would change if the data point in question were removed from the model.
 * Cook's distance (radius of the bubble): give a measure of how much the predicted values from the regression model would change if the data point in question were removed from the model.
+=======
+>>>>>>> Stashed changes
